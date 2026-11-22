@@ -4,6 +4,9 @@ import {
 } from './chess.js';
 import { chooseMove, LEVELS, levelById } from './ai.js';
 import { pieceMarkup } from './pieces.js';
+import {
+  parseJournal, remember, forget, resultTitle, resultNote,
+} from './journal.js';
 
 const SEASONS = {
   spring: { name: 'Spring', verse: 'Blossom on the stone, and the game begins again.' },
@@ -27,7 +30,11 @@ const artB = $('art-b');
 const canvas = $('particles');
 const paint = canvas.getContext('2d');
 
+const JOURNAL_KEY = 'solstice-journal';
+const REPLAY_MS = 680;
+
 const state = {
+  id: null,
   moves: [],
   human: null,
   flipped: false,
@@ -40,6 +47,10 @@ const state = {
 };
 
 let live = null;
+let review = null;
+let playing = false;
+let replayTimer = 0;
+let persistNewId = false;
 let token = 0;
 let thinking = false;
 let drag = null;
@@ -142,10 +153,19 @@ function derive(moves) {
 }
 
 function myTurn() {
-  if (!live || thinking || pending) return false;
+  if (review || !live || thinking || pending) return false;
   if (state.over || live.over) return false;
   if (state.human && live.pos.turn !== state.human) return false;
   return true;
+}
+
+function newId() {
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function viewMoves() {
+  if (!review) return state.moves;
+  return review.moves.slice(0, review.ply);
 }
 
 function sideName(color) {
@@ -155,9 +175,12 @@ function sideName(color) {
 function load() {
   const query = new URLSearchParams(location.search).get('season');
   if (SEASONS[query]) previewSeason = query;
+  state.id = newId();
   try {
     const data = JSON.parse(localStorage.getItem('solstice') || 'null');
     if (!data || data.v !== 1) return;
+    if (typeof data.id === 'string' && data.id) state.id = data.id;
+    else persistNewId = true;
     if (data.human === 'w' || data.human === 'b') state.human = data.human;
     state.flipped = !!data.flipped;
     state.sound = data.sound !== false;
@@ -182,6 +205,7 @@ function load() {
 function save() {
   localStorage.setItem('solstice', JSON.stringify({
     v: 1,
+    id: state.id,
     moves: state.moves,
     human: state.human,
     flipped: state.flipped,
@@ -276,7 +300,8 @@ function paintEdges() {
 }
 
 function paintMarks() {
-  const last = state.moves[state.moves.length - 1];
+  const moves = viewMoves();
+  const last = moves[moves.length - 1];
   const king = live && inCheck(live.pos, live.pos.turn) ? kingSquare(live.pos, live.pos.turn) : -1;
   for (let sq = 0; sq < 64; sq++) {
     const el = squares[sq];
@@ -306,6 +331,7 @@ function paintMoves(sans) {
   const list = $('moves');
   const empty = $('empty');
   list.replaceChildren();
+  const played = review ? review.ply : sans.length;
   empty.hidden = sans.length > 0;
   if (!sans.length) {
     empty.textContent = state.human && live.pos.turn !== state.human
@@ -318,39 +344,76 @@ function paintMoves(sans) {
     const num = document.createElement('span');
     num.className = 'n';
     num.textContent = String(i / 2 + 1);
-    const white = document.createElement('span');
-    white.textContent = sans[i];
-    if (i === sans.length - 1) white.className = 'now';
-    const black = document.createElement('span');
-    black.textContent = sans[i + 1] || '';
-    if (i + 1 === sans.length - 1) black.className = 'now';
-    row.append(num, white, black);
+    row.append(num, plyCell(sans[i], i, played), plyCell(sans[i + 1] || '', i + 1, played));
     list.append(row);
   }
-  $('moves-wrap').scrollTop = $('moves-wrap').scrollHeight;
+  const wrap = $('moves-wrap');
+  const current = list.querySelector('.now');
+  if (!current) {
+    wrap.scrollTop = review ? 0 : wrap.scrollHeight;
+    return;
+  }
+  const top = current.offsetTop - list.offsetTop;
+  if (top < wrap.scrollTop) wrap.scrollTop = top;
+  else if (top + current.offsetHeight > wrap.scrollTop + wrap.clientHeight) {
+    wrap.scrollTop = top + current.offsetHeight - wrap.clientHeight;
+  }
+}
+
+function plyCell(text, index, played) {
+  if (!review || !text) {
+    const span = document.createElement('span');
+    span.textContent = text;
+    if (text && index === played - 1) span.className = 'now';
+    return span;
+  }
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = text;
+  button.className = index === played - 1 ? 'now' : index >= played ? 'ahead' : '';
+  button.addEventListener('click', () => jumpReview(index + 1));
+  return button;
+}
+
+function statusText(over) {
+  if (over?.kind === 'resign') return `${sideName(over.winner)} wins. ${sideName(over.winner === 'w' ? 'b' : 'w')} resigns.`;
+  if (over?.kind === 'mate') return `${sideName(over.winner)} wins by checkmate.`;
+  if (over?.kind === 'stalemate') return 'Stalemate. The game is drawn.';
+  if (over?.kind === 'fifty') return 'Drawn by the fifty-move rule.';
+  if (over?.kind === 'repetition') return 'Drawn by threefold repetition.';
+  if (over?.kind === 'material') return 'Drawn by insufficient material.';
+  return '';
 }
 
 function paintStatus() {
-  const over = state.over || live.over;
-  let text = `${sideName(live.pos.turn)} to move.`;
-  if (over?.kind === 'resign') text = `${sideName(over.winner)} wins. ${sideName(over.winner === 'w' ? 'b' : 'w')} resigns.`;
-  else if (over?.kind === 'mate') text = `${sideName(over.winner)} wins by checkmate.`;
-  else if (over?.kind === 'stalemate') text = 'Stalemate. The game is drawn.';
-  else if (over?.kind === 'fifty') text = 'Drawn by the fifty-move rule.';
-  else if (over?.kind === 'repetition') text = 'Drawn by threefold repetition.';
-  else if (over?.kind === 'material') text = 'Drawn by insufficient material.';
-  else if (thinking) text = `${sideName(live.pos.turn)} is thinking…`;
-  else if (inCheck(live.pos, live.pos.turn)) text = `${sideName(live.pos.turn)} is in check.`;
+  const over = review
+    ? (review.ply >= review.moves.length ? review.over : null)
+    : (state.over || live.over);
+  let text = statusText(over);
+  if (!text && review && review.ply === 0) text = 'The pieces are set.';
+  else if (!text && thinking && !review) text = `${sideName(live.pos.turn)} is thinking…`;
+  else if (!text && inCheck(live.pos, live.pos.turn)) text = `${sideName(live.pos.turn)} is in check.`;
+  else if (!text) text = `${sideName(live.pos.turn)} to move.`;
   $('status').textContent = text;
   $('status').classList.toggle('check', !over && !!live && inCheck(live.pos, live.pos.turn));
-  const level = levelById(state.level);
-  const you = state.human === 'w' ? 'You have the white pieces' : 'You have the black pieces';
-  $('sub').textContent = !state.human
-    ? 'Two players, one board.'
-    : `${you}, against ${level.against}.`;
+  if (review) {
+    const when = writtenOn(review.at);
+    const who = review.human === 'w' || review.human === 'b'
+      ? `against ${levelById(review.level).against}`
+      : 'two players';
+    $('sub').textContent = `Review · ${when} · ${who}`;
+  } else {
+    const level = levelById(state.level);
+    const you = state.human === 'w' ? 'You have the white pieces' : 'You have the black pieces';
+    $('sub').textContent = !state.human
+      ? 'Two players, one board.'
+      : `${you}, against ${level.against}.`;
+  }
+  $('undo').hidden = !!review;
   $('undo').disabled = state.moves.length === 0;
-  $('resign').hidden = !state.human || !!over;
+  $('resign').hidden = !!review || !state.human || !!(state.over || live.over);
   board.classList.toggle('waiting', !myTurn());
+  paintReplay();
 }
 
 function refresh(animate) {
@@ -358,13 +421,14 @@ function refresh(animate) {
     requestAnimationFrame(() => refresh(animate));
     return;
   }
-  live = derive(state.moves);
+  const story = derive(review ? review.moves : state.moves);
+  live = review ? derive(viewMoves()) : story;
   layoutSquares();
   syncPieces(live.roster, animate);
   paintTrays(live.roster);
   paintMarks();
   paintEdges();
-  paintMoves(live.sans);
+  paintMoves(story.sans);
   paintStatus();
 }
 
@@ -381,6 +445,7 @@ function commit(move) {
   refresh(true);
   playSound(notation);
   save();
+  syncJournal();
   scheduleAi();
 }
 
@@ -505,7 +570,7 @@ function onPointerUp(event) {
 }
 
 function undo() {
-  if (!state.moves.length || pending) return;
+  if (review || !state.moves.length || pending) return;
   token += 1;
   thinking = false;
   state.over = null;
@@ -517,12 +582,15 @@ function undo() {
   if (replied) state.moves.pop();
   refresh(true);
   save();
+  syncJournal();
   if (state.human && live.pos.turn !== state.human && !live.over) scheduleAi();
 }
 
 function begin(human) {
+  leaveReview(false);
   token += 1;
   thinking = false;
+  state.id = newId();
   state.moves = [];
   state.human = human;
   state.flipped = human === 'b';
@@ -544,7 +612,7 @@ function disarmResign() {
 
 function scheduleAi() {
   const mine = ++token;
-  if (state.human == null || state.over || live.over || live.pos.turn === state.human) return;
+  if (review || state.human == null || state.over || live.over || live.pos.turn === state.human) return;
   thinking = true;
   paintStatus();
   const snapshot = fen(live.pos);
@@ -796,6 +864,7 @@ function bind() {
       refresh(false);
       playSound('#');
       save();
+      syncJournal();
       return;
     }
     $('resign').dataset.armed = '1';
@@ -819,6 +888,22 @@ function bind() {
   });
   $('help-open').addEventListener('click', () => $('help').showModal());
   $('help-close').addEventListener('click', () => $('help').close());
+  $('journal-open').addEventListener('click', openJournal);
+  $('journal-close').addEventListener('click', () => $('journal').close());
+  $('journal-list').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-id]');
+    if (!button) return;
+    const game = loadJournal().games.find((entry) => entry.id === button.dataset.id);
+    if (!game) return;
+    $('journal').close();
+    openReview(game);
+  });
+  $('ply-start').addEventListener('click', () => jumpReview(0));
+  $('ply-back').addEventListener('click', () => stepReview(-1));
+  $('ply-forward').addEventListener('click', () => stepReview(1));
+  $('ply-end').addEventListener('click', () => jumpReview(review ? review.moves.length : 0));
+  $('ply-play').addEventListener('click', toggleReplay);
+  $('review-close').addEventListener('click', () => leaveReview());
   buildLevels();
   $('level-list').addEventListener('click', (event) => {
     const button = event.target.closest('[data-level]');
@@ -838,6 +923,10 @@ function bind() {
   });
   window.addEventListener('keydown', onKey);
   document.addEventListener('visibilitychange', () => {
+    if (document.hidden && playing) {
+      stopReplay();
+      paintReplay();
+    }
     if (!document.hidden && state.season === 'auto' && !previewSeason) applySeason(false);
   });
   new ResizeObserver(() => {
@@ -857,7 +946,7 @@ function onKey(event) {
     }
     return;
   }
-  if ($('new-dialog').open || $('help').open) return;
+  if ($('new-dialog').open || $('help').open || $('journal').open) return;
   if (!$('promo').hidden) {
     const choice = { q: 'q', r: 'r', b: 'b', n: 'n' }[event.key.toLowerCase()];
     if (choice) choosePromo(choice);
@@ -865,6 +954,19 @@ function onKey(event) {
       closePromo();
       refresh(true);
     }
+    return;
+  }
+  if (review && (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'Home' || event.key === 'End')) {
+    event.preventDefault();
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') stepReview(-1);
+    else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') stepReview(1);
+    else if (event.key === 'Home') jumpReview(0);
+    else jumpReview(review.moves.length);
+    return;
+  }
+  if (review && event.key === ' ' && (event.target === document.body || event.target === board)) {
+    event.preventDefault();
+    toggleReplay();
     return;
   }
   const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -890,12 +992,18 @@ function onKey(event) {
     return;
   }
   if (event.key === 'Escape') {
+    if (event.target.closest?.('dialog, #promo, #shade')) return;
+    if (review) {
+      leaveReview();
+      return;
+    }
     clearSelection();
     disarmResign();
     return;
   }
   const key = event.key.toLowerCase();
-  if (key === 'n') $('new-dialog').showModal();
+  if (key === 'j') openJournal();
+  else if (key === 'n') $('new-dialog').showModal();
   else if (key === 'u') undo();
   else if (key === 'f') $('flip').click();
   else if (key === 'm') $('sound').click();
@@ -932,6 +1040,179 @@ function buildLevels() {
   paintLevels();
 }
 
+function loadJournal() {
+  return parseJournal(localStorage.getItem(JOURNAL_KEY));
+}
+
+function syncJournal() {
+  const current = loadJournal();
+  const over = state.over || live?.over;
+  let next = current;
+  if (over && state.moves.length && state.id) {
+    next = remember(current, {
+      id: state.id,
+      at: Date.now(),
+      moves: state.moves,
+      human: state.human,
+      level: state.level,
+      over,
+      season: visibleSeason(),
+    });
+  } else if (state.id) next = forget(current, state.id);
+  if (next !== current) localStorage.setItem(JOURNAL_KEY, JSON.stringify(next));
+}
+
+function writtenOn(at) {
+  const date = new Date(at);
+  const opts = { day: 'numeric', month: 'long' };
+  if (date.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return date.toLocaleDateString(undefined, opts);
+}
+
+function journalMeta(entry) {
+  const season = SEASONS[entry.season]?.name;
+  const note = resultNote(entry.over);
+  const count = entry.moves.length === 1 ? '1 move' : `${entry.moves.length} moves`;
+  const who = entry.human === 'w' || entry.human === 'b'
+    ? `Against ${levelById(entry.level).against}`
+    : 'Two players';
+  return [season, note, count, who].filter(Boolean).join(' · ');
+}
+
+function paintJournal() {
+  const games = loadJournal().games;
+  const list = $('journal-list');
+  if (!games.length) {
+    const note = document.createElement('p');
+    note.className = 'journal-empty';
+    note.textContent = 'Nothing is written here yet.';
+    list.replaceChildren(note);
+    return;
+  }
+  list.replaceChildren(...games.map((game) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.id = game.id;
+    const top = document.createElement('span');
+    top.className = 'journal-top';
+    const result = document.createElement('span');
+    result.className = 'journal-result';
+    result.textContent = resultTitle(game.over);
+    const when = document.createElement('span');
+    when.className = 'journal-when';
+    when.textContent = writtenOn(game.at);
+    top.append(result, when);
+    const meta = document.createElement('span');
+    meta.className = 'journal-meta';
+    meta.textContent = journalMeta(game);
+    button.append(top, meta);
+    return button;
+  }));
+}
+
+function openJournal() {
+  stopReplay();
+  paintReplay();
+  paintJournal();
+  $('journal').showModal();
+}
+
+function openReview(game) {
+  stopReplay();
+  token += 1;
+  thinking = false;
+  state.selected = null;
+  disarmResign();
+  closePromo();
+  review = {
+    id: game.id,
+    at: game.at,
+    human: game.human,
+    level: game.level,
+    over: game.over,
+    moves: game.moves.map((move) => ({ from: move.from, to: move.to, promo: move.promo })),
+    ply: game.moves.length,
+  };
+  refresh(false);
+}
+
+function leaveReview(resume = true) {
+  if (!review) return;
+  stopReplay();
+  review = null;
+  state.selected = null;
+  refresh(false);
+  if (resume) scheduleAi();
+}
+
+function jumpReview(ply) {
+  if (!review) return;
+  stopReplay();
+  const next = Math.max(0, Math.min(review.moves.length, ply));
+  const glide = Math.abs(next - review.ply) === 1;
+  review.ply = next;
+  refresh(glide && !reduceMotion);
+}
+
+function stepReview(delta) {
+  if (!review) return;
+  jumpReview(review.ply + delta);
+}
+
+function stopReplay() {
+  playing = false;
+  clearTimeout(replayTimer);
+}
+
+function paintReplay() {
+  const on = !!review;
+  $('replay').hidden = !on;
+  if (!on) return;
+  const ply = review.ply;
+  const end = review.moves.length;
+  $('ply-start').disabled = ply === 0;
+  $('ply-back').disabled = ply === 0;
+  $('ply-forward').disabled = ply === end;
+  $('ply-end').disabled = ply === end;
+  $('ply-play').setAttribute('aria-pressed', playing ? 'true' : 'false');
+  $('ply-play').setAttribute('aria-label', playing ? 'Pause' : 'Replay');
+  $('ply-play').querySelector('.when-paused').hidden = playing;
+  $('ply-play').querySelector('.when-playing').hidden = !playing;
+}
+
+function toggleReplay() {
+  if (!review) return;
+  if (playing) {
+    stopReplay();
+    paintReplay();
+    return;
+  }
+  if (review.ply >= review.moves.length) {
+    review.ply = 0;
+    refresh(false);
+  }
+  playing = true;
+  paintReplay();
+  replayTimer = window.setTimeout(tickReplay, reduceMotion ? 900 : REPLAY_MS);
+}
+
+function tickReplay() {
+  if (!review || !playing) return;
+  if (review.ply >= review.moves.length) {
+    stopReplay();
+    paintReplay();
+    return;
+  }
+  review.ply += 1;
+  refresh(!reduceMotion);
+  if (!review || review.ply >= review.moves.length) {
+    stopReplay();
+    paintReplay();
+    return;
+  }
+  replayTimer = window.setTimeout(tickReplay, reduceMotion ? 900 : REPLAY_MS);
+}
+
 function init() {
   load();
   for (let sq = 0; sq < 64; sq++) {
@@ -962,6 +1243,8 @@ function init() {
   resizeCanvas();
   if (!reduceMotion) requestAnimationFrame(frame);
   refresh(false);
+  if (persistNewId) save();
+  syncJournal();
   scheduleAi();
 }
 

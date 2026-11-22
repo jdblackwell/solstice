@@ -17,7 +17,7 @@ python3 -m http.server 8734
 
 Then open http://localhost:8734. Opening the files directly will not load the game.
 
-Play two people at one board, or start a game as White or Black and the computer answers. Against the computer, choose an experience from beginner (under 1200) through senior master (2400 and up). Castling, en passant, promotion, and the usual draws are all played.
+Play two people at one board, or start a game as White or Black and the computer answers. Against the computer, choose an experience from beginner (under 1200) through senior master (2400 and up). Castling, en passant, promotion, and the usual draws are all played. A finished game is kept in the journal, where you can open it and replay it move by move.
 
 | Key | Action |
 | --- | --- |
@@ -27,6 +27,8 @@ Play two people at one board, or start a game as White or Black and the computer
 | U or Ctrl+Z | Undo |
 | F | Flip the board |
 | M | Sound |
+| J | Journal |
+| Left and Right | Step through a reviewed game |
 | 1–4 | Spring, summer, autumn, winter |
 | 0 | Follow the date |
 | ? | Show the keys |

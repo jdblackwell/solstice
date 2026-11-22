@@ -495,8 +495,72 @@ h1 {
 .moves li { display: contents; }
 .moves .n { text-align: right; color: var(--muted); }
 .moves .now { color: var(--accent); }
-.foot { display: flex; justify-content: space-between; }
+.foot { display: flex; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
 .foot .link { margin-top: 0; }
+.replay { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.replay[hidden] { display: none; }
+.replay-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.replay-controls button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.replay-controls button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+.replay-controls button:disabled { opacity: 0.35; cursor: default; }
+.replay-controls button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.replay-controls svg { width: 18px; height: 18px; }
+.replay-controls [hidden] { display: none; }
+.replay .link { margin-top: 0; }
+.moves button {
+  border: 0;
+  background: none;
+  padding: 0.05rem 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  border-radius: 4px;
+}
+.moves button:hover { color: var(--accent); }
+.moves button.ahead { color: var(--muted); }
+.journal-list { display: flex; flex-direction: column; gap: 8px; }
+.journal-empty {
+  margin: 0;
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--muted);
+}
+.journal-list button {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  cursor: pointer;
+}
+.journal-list button:hover { background: rgba(255, 255, 255, 0.1); }
+.journal-top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.journal-result { font-weight: 600; }
+.journal-when {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.journal-meta { color: var(--muted); font-size: 0.92rem; line-height: 1.35; }
 
 .shade {
   position: fixed;

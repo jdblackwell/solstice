@@ -87,11 +87,33 @@
         <button type="button" id="sound" aria-pressed="true">Sound on</button>
         <button type="button" id="resign" hidden>Resign</button>
       </div>
+      <div class="replay" id="replay" hidden>
+        <div class="replay-controls" role="group" aria-label="Replay">
+          <button type="button" id="ply-start" aria-label="Opening position">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 5h2.2v14H5zm13 1L9.5 12 18 18z"/></svg>
+          </button>
+          <button type="button" id="ply-back" aria-label="Previous move">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16 5 7 12l9 7z"/></svg>
+          </button>
+          <button type="button" id="ply-play" aria-label="Replay" aria-pressed="false">
+            <svg class="when-paused" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+            <svg class="when-playing" viewBox="0 0 24 24" aria-hidden="true" hidden><path fill="currentColor" d="M6 5h4.2v14H6zm8 0H18v14h-4z"/></svg>
+          </button>
+          <button type="button" id="ply-forward" aria-label="Next move">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5l9 7-9 7z"/></svg>
+          </button>
+          <button type="button" id="ply-end" aria-label="Final position">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 6l8.5 6L6 18zM16.8 5H19v14h-2.2z"/></svg>
+          </button>
+        </div>
+        <button type="button" class="link" id="review-close">Return to this game</button>
+      </div>
       <div class="moves-wrap" id="moves-wrap">
         <p class="empty" id="empty">The first move is yours.</p>
         <ol class="moves" id="moves"></ol>
       </div>
       <div class="foot">
+        <button type="button" class="link" id="journal-open">Journal</button>
         <button type="button" class="link" id="copy">Copy position</button>
         <button type="button" class="link" id="help-open">Keys</button>
       </div>
@@ -118,6 +140,13 @@
   <button type="button" class="link" id="new-cancel">Keep this game</button>
 </dialog>
 
+<dialog class="sheet" id="journal">
+  <h2>Journal</h2>
+  <p class="lead" id="journal-lead">Finished games wait here.</p>
+  <div class="journal-list" id="journal-list"></div>
+  <button type="button" class="link" id="journal-close">Close</button>
+</dialog>
+
 <dialog class="sheet" id="help">
   <h2>Keys</h2>
   <dl class="keys">
@@ -127,6 +156,8 @@
     <div><dt>U or Ctrl+Z</dt><dd>Undo</dd></div>
     <div><dt>F</dt><dd>Flip the board</dd></div>
     <div><dt>M</dt><dd>Sound</dd></div>
+    <div><dt>J</dt><dd>Journal</dd></div>
+    <div><dt>Left and Right</dt><dd>Step through a reviewed game</dd></div>
     <div><dt>1–4</dt><dd>Spring, summer, autumn, winter</dd></div>
     <div><dt>0</dt><dd>Follow the date</dd></div>
     <div><dt>?</dt><dd>This list</dd></div>
