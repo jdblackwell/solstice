@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solstice</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23231814'/%3E%3Cpath d='M16 4.5l2.1 6.4h6.7l-5.4 4 2.1 6.4L16 17.4 10.5 21.3l2.1-6.4-5.4-4h6.7z' fill='%23e39b3b'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+<script>
+  (function () {
+    var m = new Date().getMonth();
+    var s = m < 2 || m === 11 ? 'winter' : m < 5 ? 'spring' : m < 8 ? 'summer' : 'autumn';
+    var q = new URLSearchParams(location.search).get('season');
+    if (q === 'spring' || q === 'summer' || q === 'autumn' || q === 'winter') s = q;
+    else {
+      try {
+        var saved = JSON.parse(localStorage.getItem('solstice') || 'null');
+        if (saved && (saved.season === 'spring' || saved.season === 'summer' || saved.season === 'autumn' || saved.season === 'winter')) s = saved.season;
+      } catch (e) {}
+    }
+    document.documentElement.dataset.season = s;
+  })();
+</script>
+</head>
+<body>
+<svg class="defs" aria-hidden="true">
+  <defs>
+    <linearGradient id="metal-w" x1="18%" y1="0%" x2="82%" y2="100%">
+      <stop offset="0%" stop-color="var(--pw-0)"/>
+      <stop offset="46%" stop-color="var(--pw-1)"/>
+      <stop offset="100%" stop-color="var(--pw-2)"/>
+    </linearGradient>
+    <linearGradient id="metal-b" x1="16%" y1="0%" x2="88%" y2="100%">
+      <stop offset="0%" stop-color="var(--pb-0)"/>
+      <stop offset="42%" stop-color="var(--pb-1)"/>
+      <stop offset="100%" stop-color="var(--pb-2)"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="scene">
+  <img class="art" id="art-a" alt="">
+  <img class="art" id="art-b" alt="">
+  <canvas id="particles"></canvas>
+  <div class="vignette"></div>
+
+  <main class="stage">
+    <section class="card lore">
+      <p class="kicker">A game of chess</p>
+      <h1>Solstice</h1>
+      <p class="verse" id="verse"></p>
+      <p class="when"><span id="today"></span><span class="dot" aria-hidden="true">·</span><span id="season-label"></span></p>
+      <div class="seasons" role="radiogroup" aria-label="Season">
+        <button type="button" role="radio" data-season="spring" aria-label="Spring">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><ellipse cx="12" cy="5" rx="2" ry="3.2" transform="rotate(0 12 12)"/><ellipse cx="12" cy="5" rx="2" ry="3.2" transform="rotate(72 12 12)"/><ellipse cx="12" cy="5" rx="2" ry="3.2" transform="rotate(144 12 12)"/><ellipse cx="12" cy="5" rx="2" ry="3.2" transform="rotate(216 12 12)"/><ellipse cx="12" cy="5" rx="2" ry="3.2" transform="rotate(288 12 12)"/><circle cx="12" cy="12" r="2.1"/></g></svg>
+        </button>
+        <button type="button" role="radio" data-season="summer" aria-label="Summer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.4" fill="currentColor"/><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 2.4v2.3M12 19.3v2.3M2.4 12h2.3M19.3 12h2.3M5.1 5.1l1.6 1.6M17.3 17.3l1.6 1.6M18.9 5.1l-1.6 1.6M6.7 17.3l-1.6 1.6"/></g></svg>
+        </button>
+        <button type="button" role="radio" data-season="autumn" aria-label="Autumn">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2c1.2 3.2 4.6 4.8 6.2 7.2 1.6 2.4 1.2 5.4-.2 7.6A6.6 6.6 0 0 1 12 21a6.6 6.6 0 0 1-6-4.2c-1.4-2.2-1.8-5.2-.2-7.6C7.4 6.8 10.8 5.2 12 2z"/></svg>
+        </button>
+        <button type="button" role="radio" data-season="winter" aria-label="Winter">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 2.5v19M4.2 7l15.6 10M19.8 7 4.2 17"/><path d="M12 6.5 10.2 4.2M12 6.5l1.8-2.3M12 17.5 10.2 19.8M12 17.5l1.8 2.3M7.2 9.2 4.6 8.2M7.2 9.2 6.6 6.6M16.8 14.8l2.6 1M16.8 14.8l.6 2.6M16.8 9.2l2.6-1M16.8 9.2l.6-2.6M7.2 14.8 4.6 15.8M7.2 14.8 6.6 17.4"/></g></svg>
+        </button>
+      </div>
+      <button type="button" class="link" id="follow" hidden>Follow the year</button>
+    </section>
+
+    <section class="table">
+      <div class="frame">
+        <div class="tray" id="tray-top"><span class="diff" id="diff-top"></span><div class="caps" id="caps-top"></div></div>
+        <div class="ranks" id="ranks"></div>
+        <div class="board" id="board" tabindex="0" role="grid" aria-label="Chessboard"></div>
+        <div class="files" id="files"></div>
+        <div class="tray" id="tray-bottom"><span class="diff" id="diff-bottom"></span><div class="caps" id="caps-bottom"></div></div>
+      </div>
+    </section>
+
+    <section class="card log">
+      <p class="status" id="status" aria-live="polite"></p>
+      <p class="sub" id="sub"></p>
+      <div class="actions">
+        <button type="button" class="primary" id="new-game">New game</button>
+        <button type="button" id="undo">Undo</button>
+        <button type="button" id="flip">Flip</button>
+        <button type="button" id="sound" aria-pressed="true">Sound on</button>
+        <button type="button" id="resign" hidden>Resign</button>
+      </div>
+      <div class="moves-wrap" id="moves-wrap">
+        <p class="empty" id="empty">The first move is yours.</p>
+        <ol class="moves" id="moves"></ol>
+      </div>
+      <div class="foot">
+        <button type="button" class="link" id="copy">Copy position</button>
+        <button type="button" class="link" id="help-open">Keys</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="shade" id="shade" hidden></div>
+<div class="promo" id="promo" hidden role="dialog" aria-modal="true" aria-label="Promote"></div>
+
+<dialog class="sheet" id="new-dialog">
+  <h2>New game</h2>
+  <p class="lead">The pieces go home. The light outside stays as it is.</p>
+  <div class="choices">
+    <button type="button" data-human="">Two players</button>
+    <button type="button" data-human="w">Play White</button>
+    <button type="button" data-human="b">Play Black</button>
+  </div>
+  <div class="levels">
+    <p class="kicker" id="level-kicker">Experience</p>
+    <p class="level-line" id="level-line"></p>
+    <div class="level-list" id="level-list" role="radiogroup" aria-label="Experience"></div>
+  </div>
+  <button type="button" class="link" id="new-cancel">Keep this game</button>
+</dialog>
+
+<dialog class="sheet" id="help">
+  <h2>Keys</h2>
+  <dl class="keys">
+    <div><dt>Drag or click</dt><dd>Move a piece</dd></div>
+    <div><dt>Arrows, Enter</dt><dd>Move from the keyboard</dd></div>
+    <div><dt>N</dt><dd>New game</dd></div>
+    <div><dt>U or Ctrl+Z</dt><dd>Undo</dd></div>
+    <div><dt>F</dt><dd>Flip the board</dd></div>
+    <div><dt>M</dt><dd>Sound</dd></div>
+    <div><dt>1–4</dt><dd>Spring, summer, autumn, winter</dd></div>
+    <div><dt>0</dt><dd>Follow the date</dd></div>
+    <div><dt>?</dt><dd>This list</dd></div>
+    <div><dt>Esc</dt><dd>Cancel</dd></div>
+  </dl>
+  <button type="button" class="link" id="help-close">Close</button>
+</dialog>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
