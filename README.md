@@ -2,6 +2,15 @@
 
 Chess, in the light of the year. The board keeps the northern seasons: spring from March, summer from June, autumn from September, and winter from December. You can step into another season without waiting for it.
 
+<p>
+  <img src="screenshots/spring.jpg" alt="Spring" width="49%">
+  <img src="screenshots/summer.jpg" alt="Summer" width="49%">
+</p>
+<p>
+  <img src="screenshots/autumn.jpg" alt="Autumn" width="49%">
+  <img src="screenshots/winter.jpg" alt="Winter" width="49%">
+</p>
+
 ```bash
 python3 -m http.server 8734
 ```
